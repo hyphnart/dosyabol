@@ -1,0 +1,39 @@
+name: Dosya Bol Windows EXE
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: 'win64_msvc2022_64'
+          modules: ''
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel 4 2>&1 | Tee-Object build-log.txt
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package portable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force portable | Out-Null
+          Copy-Item build/Release/DosyaBol.exe portable/
+          windeployqt --release --no-translations portable/DosyaBol.exe
+          Compress-Archive -Path portable/* -DestinationPath Dosya_Bol_Windows_x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dosya-Bol-Windows-x64
+          path: Dosya_Bol_Windows_x64.zip
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: Derleme-Hata-Kayitlari
+          path: build-log.txt
