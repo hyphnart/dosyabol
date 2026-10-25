@@ -12,6 +12,8 @@
 #endif
 #include "../common/dbcore.h"
 #include <csignal>
+#include <cstdlib>
+#include <exception>
 #include <cstdio>
 #include <iostream>
 

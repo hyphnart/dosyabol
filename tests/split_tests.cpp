@@ -8,6 +8,7 @@
 #include <QProcess>
 #include <QRandomGenerator>
 #include <QTemporaryDir>
+#include <QDateTime>
 #include <QDebug>
 #include <atomic>
 
@@ -293,6 +294,7 @@ static RunResult runProcess(const QString &program, const QStringList &args, con
 static void testDecoderExe(const QString &root) {
     const QString stub = DOSYABOL_STUB_PATH;
     if (!QFileInfo(stub).isFile()) { qWarning() << "Çözücü bulunamadı; exe testleri atlandı"; return; }
+    const qint64 stubPart = QFileInfo(stub).size() + 20000;   // gömülü çözücü + ~20 KB veri
     const QByteArray data = makeData(260000, 9, true) + makeData(50000, 10, false);
     const QString src = root + "/exe/belge.bin";
     CHECK(writeFile(src, data));
@@ -300,11 +302,11 @@ static void testDecoderExe(const QString &root) {
     for (const QString &pw : QStringList{QString(), QString("exe şifresi")})
         for (int mode = 0; mode < 3; ++mode) {   // 0: yalnızca kopya, 1: ilk parçaya göm, 2: her parçaya göm
             const QString out = root + QString("/exe_%1_%2").arg(pw.isEmpty() ? "p" : "e").arg(mode);
-            CHECK_MSG(packFile(src, out, mode >= 1 ? 150000 : 60000, 6, pw, err, true, mode >= 1, mode == 2), err);
+            CHECK_MSG(packFile(src, out, mode >= 1 ? stubPart : 60000, 6, pw, err, true, mode >= 1, mode == 2), err);
             const QStringList parts = partFiles(out);
             CHECK(!parts.isEmpty());
             if (parts.isEmpty()) continue;
-            for (int i = 0; i < parts.size(); ++i) CHECK(QFileInfo(out + "/" + parts[i]).size() <= (mode >= 1 ? 150000 : 60000));
+            for (int i = 0; i < parts.size(); ++i) CHECK(QFileInfo(out + "/" + parts[i]).size() <= (mode >= 1 ? stubPart : 60000));
             const QByteArray pwIn = pw.isEmpty() ? QByteArray() : (pw.toUtf8() + "\n");
             const QString decoderCopy = out + "/" + QFileInfo(stub).fileName();
             CHECK(QFileInfo(decoderCopy).isFile());
@@ -344,7 +346,7 @@ static void testDecoderExe(const QString &root) {
     CHECK(writeFile(fsrc + "/c.bin", makeData(80000, 11, false)));
     QDir().mkpath(fsrc + "/bos");
     const QString fout = root + "/exe_folder_out";
-    CHECK_MSG(packFile(fsrc, fout, 150000, 6, "", err, true, true, true), err);
+    CHECK_MSG(packFile(fsrc, fout, stubPart, 6, "", err, true, true, true), err);
     if (partFiles(fout).isEmpty()) return;
     const RunResult r = runProcess(fout + "/" + partFiles(fout).first(), {"--cikis", fout + "_x"}, "");
     CHECK_MSG(r.code == 0, r.out);
@@ -359,9 +361,15 @@ static void testEmptyAndTiny(const QString &root) {
     CHECK_MSG(SplitEngine::unpack(root + "/e_out/" + partFiles(root + "/e_out").first(), root + "/e_dst", "", noProgress, cancelFlag, err), err);
     CHECK(QFileInfo(root + "/e_dst/empty.bin").size() == 0 && QFileInfo(root + "/e_dst/empty.bin").isFile());
     CHECK(writeFile(root + "/e/one.txt", "x"));
+    {   // değişiklik tarihi korunmalı
+        QFile m(root + "/e/one.txt");
+        CHECK(m.open(QIODevice::ReadWrite));
+        CHECK(m.setFileTime(QDateTime::fromSecsSinceEpoch(1577880000), QFileDevice::FileModificationTime));
+    }
     CHECK_MSG(packFile(root + "/e/one.txt", root + "/e_out2", 1024 + 128, 9, "p", err), err);
     CHECK_MSG(SplitEngine::unpack(root + "/e_out2/" + partFiles(root + "/e_out2").first(), root + "/e_dst2", "p", noProgress, cancelFlag, err), err);
     CHECK(readFile(root + "/e_dst2/one.txt") == "x");
+    CHECK(qAbs(QFileInfo(root + "/e_dst2/one.txt").lastModified().toSecsSinceEpoch() - 1577880000) <= 2);
 }
 
 int main(int argc, char **argv) {

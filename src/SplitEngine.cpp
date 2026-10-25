@@ -3,6 +3,8 @@
 #include <QCoreApplication>
 #include <QDirIterator>
 #include <QRandomGenerator>
+#include <array>
+#include <iterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>

@@ -819,8 +819,11 @@ inline Result processImpl(const Archive &a, const Options &o) {
             }
             if (done[i].mtime > 0) {
                 try {
-                    const auto sys = std::chrono::sys_seconds{std::chrono::seconds(done[i].mtime)};
-                    fs::last_write_time(done[i].fin, std::chrono::file_clock::from_sys(sys), ec);
+                    // file_clock::from_sys her derleyicide yok; iki saatin şimdiki farkından çevir.
+                    const auto fileNow = fs::file_time_type::clock::now();
+                    const auto sysNow = std::chrono::system_clock::now();
+                    const auto target = std::chrono::system_clock::time_point(std::chrono::seconds(done[i].mtime));
+                    fs::last_write_time(done[i].fin, fileNow + std::chrono::duration_cast<fs::file_time_type::duration>(target - sysNow), ec);
                 } catch (...) {}
             }
         }
