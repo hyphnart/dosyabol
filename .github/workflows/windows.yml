@@ -26,6 +26,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force portable | Out-Null
           Copy-Item build/Release/DosyaBol.exe portable/
+          Copy-Item build/Release/DosyaBolCozucu.exe portable/
           windeployqt --release --no-translations portable/DosyaBol.exe
           Compress-Archive -Path portable/* -DestinationPath Dosya_Bol_Windows_x64.zip
       - uses: actions/upload-artifact@v4
